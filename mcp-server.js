@@ -49,13 +49,13 @@ import { registerSearchTools } from './tools/search.js';
 export function initializeMcpServer() {
   const enabledTools = getEnabledTools(READONLY_MODE);
 
-  log('INFO', `@sesonet/freelo-mcp-server v1.0.0 starting...`);
+  log('INFO', `@sesonet/freelo-mcp-server v0.5.0 starting...`);
   log('INFO', `Mode: ${READONLY_MODE ? 'READONLY' : 'FULL'} (${enabledTools.length} tools)`);
   log('INFO', `Audit: ${isAuditEnabled() ? `enabled (${getAuditLogPath()})` : 'disabled'}`);
 
   const server = new McpServer({
     name: '@sesonet/freelo-mcp-server',
-    version: '1.0.0',
+    version: '0.5.0',
     description: 'MCP Server for Freelo API - readonly mode, audit logging, reduced toolset'
   });
 

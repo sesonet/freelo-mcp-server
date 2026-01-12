@@ -1,20 +1,15 @@
 {
   "name": "@sesonet/freelo-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP Server for Freelo API - fork with readonly mode, audit logging, and reduced toolset",
-  "main": "server.js",
+  "version": "0.5.0",
+  "description": "MCP Server for Freelo API - streamlined fork with readonly mode and audit logging",
+  "main": "mcp-server.js",
   "type": "module",
   "bin": {
-    "freelo-mcp-server": "bin/freelo-mcp.js",
-    "freelo-mcp-http": "mcp-server-http.js"
+    "freelo-mcp-server": "bin/freelo-mcp.js"
   },
   "scripts": {
     "start": "node mcp-server.js",
-    "start:readonly": "FREELO_READONLY=true node mcp-server.js",
-    "dev": "nodemon mcp-server.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles",
-    "mcp": "node mcp-server.js",
-    "mcp:http": "node mcp-server-http.js"
+    "start:readonly": "FREELO_READONLY=true node mcp-server.js"
   },
   "author": "sesonet (fork of karlost/FreeloMCP)",
   "license": "MIT",
@@ -25,15 +20,10 @@
   "keywords": [
     "freelo",
     "mcp",
-    "api",
     "modelcontextprotocol",
-    "cline",
-    "n8n",
-    "sse",
-    "server-sent-events",
-    "http",
-    "streamable-http",
-    "mcp-server"
+    "mcp-server",
+    "claude",
+    "llm"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -41,41 +31,17 @@
   "files": [
     "bin/",
     "config/",
-    "controllers/",
-    "middleware/",
-    "routes/",
     "utils/",
     "tools/",
-    "examples/",
     "mcp-server.js",
-    "mcp-server-sse.js",
-    "mcp-server-http.js",
-    "server.js",
     "LICENSE",
     "README.md",
-    "AI_GUIDE.md",
-    "MIGRATION_HTTP.md"
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
     "axios": "^1.6.2",
-    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
-    "form-data": "^4.0.2",
-    "helmet": "^7.1.0",
-    "multer": "^1.4.5-lts.2",
     "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.23.7",
-    "@babel/preset-env": "^7.23.7",
-    "babel-jest": "^29.7.0",
-    "chalk": "^4.1.2",
-    "jest": "^29.7.0",
-    "nock": "^14.0.3",
-    "nodemon": "^3.0.2",
-    "supertest": "^6.3.3"
   }
 }
