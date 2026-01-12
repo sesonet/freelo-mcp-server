@@ -10,12 +10,18 @@ MCP (Model Context Protocol) server for [Freelo](https://www.freelo.io/) project
 
 Fork of [karlost/FreeloMCP](https://github.com/karlost/FreeloMCP).
 
+## Installation
+
+> **Note:** This package is **not published to npm registry**. Install directly from GitHub.
+
+```bash
+# Install globally from GitHub
+npm install -g github:sesonet/freelo-mcp-server
+```
+
 ## Quick Start
 
 ```bash
-# Install globally
-npm install -g @sesonet/freelo-mcp-server
-
 # Set credentials
 export FREELO_EMAIL="your@email.com"
 export FREELO_API_KEY="your-api-key"
@@ -23,8 +29,8 @@ export FREELO_API_KEY="your-api-key"
 # Run in readonly mode (default)
 freelo-mcp-server
 
-# Run with edit capabilities
-freelo-mcp-server --full
+# Run with all tools (including edit operations)
+FREELO_READONLY=false freelo-mcp-server
 ```
 
 ## Documentation
@@ -55,16 +61,13 @@ freelo-mcp-server --full
 
 ### Readonly Mode (Default)
 ```bash
-freelo-mcp-server --readonly
-# or
 FREELO_READONLY=true freelo-mcp-server
 ```
 Only 20 read-only tools available. Safe for browsing and reporting.
 
 ### Full Mode
 ```bash
-freelo-mcp-server --full
-# or without --readonly flag
+FREELO_READONLY=false freelo-mcp-server
 ```
 All 33 tools available including create, update, and finish operations.
 
@@ -99,24 +102,27 @@ FREELO_AUDIT_ENABLED=false            # Disable logging
 
 ### Claude Code (CLI)
 
+Add to `~/.claude.json` (macOS/Linux) or `%USERPROFILE%\.claude.json` (Windows):
+
 ```json
 {
   "mcpServers": {
     "freelo": {
+      "type": "stdio",
       "command": "freelo-mcp-server",
-      "args": ["--readonly"],
       "env": {
         "FREELO_EMAIL": "your@email.com",
-        "FREELO_API_KEY": "your-api-key"
+        "FREELO_API_KEY": "your-api-key",
+        "FREELO_READONLY": "true"
       }
     }
   }
 }
 ```
 
-### Cursor / VS Code
+### Other Clients
 
-See [Installation Guide](docs/INSTALLATION.md) for detailed setup.
+See [Installation Guide](docs/INSTALLATION.md) for Cursor, VS Code, Windsurf, and Continue.dev setup.
 
 ## License
 
