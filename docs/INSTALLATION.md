@@ -10,40 +10,43 @@ Complete setup instructions for @sesonet/freelo-mcp-server on all supported MCP 
 
 ## Installation Methods
 
-### Global Installation (Recommended)
+### Global Installation from GitHub (Recommended)
 
 ```bash
-npm install -g @sesonet/freelo-mcp-server
+npm install -g github:sesonet/freelo-mcp-server
 ```
 
-### Local Installation
+This installs the `freelo-mcp-server` command globally.
+
+### Local Installation from GitHub
 
 ```bash
-npm install @sesonet/freelo-mcp-server
+npm install github:sesonet/freelo-mcp-server
 ```
 
-### Using npx (No Installation)
-
-```bash
-npx @sesonet/freelo-mcp-server
-```
+> **Note**: This package is not published to npm registry. Install from GitHub.
 
 ## Client Setup
 
 ### Claude Code (CLI)
 
-1. Run `/mcp` command in Claude Code to manage MCP servers, or edit config directly:
+1. Install globally first:
+```bash
+npm install -g github:sesonet/freelo-mcp-server
+```
+
+2. Run `/mcp` command in Claude Code to manage MCP servers, or edit config directly:
    - **Windows**: `%USERPROFILE%\.claude.json`
    - **macOS/Linux**: `~/.claude.json`
 
-2. Add to the root-level `mcpServers` object:
+3. Add to the root-level `mcpServers` object:
 ```json
 {
   "mcpServers": {
     "freelo": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@sesonet/freelo-mcp-server"],
+      "command": "freelo-mcp-server",
+      "args": [],
       "env": {
         "FREELO_EMAIL": "your@email.com",
         "FREELO_API_KEY": "your-api-key",
@@ -56,71 +59,75 @@ npx @sesonet/freelo-mcp-server
 
 > **Note**: The `mcpServers` section is at the root level of `.claude.json`, not inside `.claude/.mcp.json`.
 
-3. Restart Claude Code and verify with `/mcp` command
+4. Restart Claude Code and verify with `/mcp` command
 
 ### Claude Desktop (Anthropic)
 
-1. Find config file:
+1. Install globally: `npm install -g github:sesonet/freelo-mcp-server`
+
+2. Find config file:
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
    - **Linux**: `~/.config/claude/claude_desktop_config.json`
 
-2. Add configuration:
+3. Add configuration:
 ```json
 {
   "mcpServers": {
     "freelo": {
-      "command": "npx",
-      "args": ["-y", "@sesonet/freelo-mcp-server", "--readonly"],
+      "command": "freelo-mcp-server",
       "env": {
         "FREELO_EMAIL": "your@email.com",
-        "FREELO_API_KEY": "your-api-key"
+        "FREELO_API_KEY": "your-api-key",
+        "FREELO_READONLY": "true"
       }
     }
   }
 }
 ```
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
 ### Cursor
 
-1. Open Cursor Settings (Cmd/Ctrl + ,)
-2. Search for "MCP"
-3. Click "Edit in settings.json"
-4. Add:
+1. Install globally: `npm install -g github:sesonet/freelo-mcp-server`
+2. Open Cursor Settings (Cmd/Ctrl + ,)
+3. Search for "MCP"
+4. Click "Edit in settings.json"
+5. Add:
 ```json
 {
   "mcp.servers": {
     "freelo": {
-      "command": "npx",
-      "args": ["-y", "@sesonet/freelo-mcp-server"],
+      "command": "freelo-mcp-server",
       "env": {
         "FREELO_EMAIL": "your@email.com",
-        "FREELO_API_KEY": "your-api-key"
+        "FREELO_API_KEY": "your-api-key",
+        "FREELO_READONLY": "true"
       }
     }
   }
 }
 ```
 
-5. Restart Cursor
+6. Restart Cursor
 
 ### VS Code with Claude Extension
 
-1. Install "Claude for VS Code" extension
-2. Open VS Code Settings (Cmd/Ctrl + ,)
-3. Search for "Claude MCP"
-4. Add server in `settings.json`:
+1. Install globally: `npm install -g github:sesonet/freelo-mcp-server`
+2. Install "Claude for VS Code" extension
+3. Open VS Code Settings (Cmd/Ctrl + ,)
+4. Search for "Claude MCP"
+5. Add server in `settings.json`:
 ```json
 {
   "claude.mcpServers": {
     "freelo": {
-      "command": "npx",
-      "args": ["-y", "@sesonet/freelo-mcp-server"],
+      "command": "freelo-mcp-server",
       "env": {
         "FREELO_EMAIL": "your@email.com",
-        "FREELO_API_KEY": "your-api-key"
+        "FREELO_API_KEY": "your-api-key",
+        "FREELO_READONLY": "true"
       }
     }
   }
@@ -129,17 +136,18 @@ npx @sesonet/freelo-mcp-server
 
 ### Windsurf
 
-1. Open Windsurf Settings
-2. Navigate to AI > MCP Servers
-3. Add configuration:
+1. Install globally: `npm install -g github:sesonet/freelo-mcp-server`
+2. Open Windsurf Settings
+3. Navigate to AI > MCP Servers
+4. Add configuration:
 ```json
 {
   "freelo": {
-    "command": "npx",
-    "args": ["-y", "@sesonet/freelo-mcp-server"],
+    "command": "freelo-mcp-server",
     "env": {
       "FREELO_EMAIL": "your@email.com",
-      "FREELO_API_KEY": "your-api-key"
+      "FREELO_API_KEY": "your-api-key",
+      "FREELO_READONLY": "true"
     }
   }
 }
@@ -147,7 +155,8 @@ npx @sesonet/freelo-mcp-server
 
 ### Continue.dev
 
-Add to `~/.continue/config.json`:
+1. Install globally: `npm install -g github:sesonet/freelo-mcp-server`
+2. Add to `~/.continue/config.json`:
 ```json
 {
   "experimental": {
@@ -155,8 +164,7 @@ Add to `~/.continue/config.json`:
       {
         "transport": {
           "type": "stdio",
-          "command": "npx",
-          "args": ["-y", "@sesonet/freelo-mcp-server"]
+          "command": "freelo-mcp-server"
         },
         "env": {
           "FREELO_EMAIL": "your@email.com",
