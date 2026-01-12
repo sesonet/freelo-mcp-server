@@ -3,6 +3,7 @@
  */
 
 import { getAnnotations, getToolTitle } from './toolAnnotations.js';
+import { withAuditLogging } from './auditLogger.js';
 
 // Detect array-style output schemas created by createArrayResponseSchema
 const isArrayOutputSchema = (schema) => Boolean(schema?._def?.freeloArrayResponse);
@@ -128,14 +129,21 @@ export function registerToolWithMetadata(
     config.outputSchema = processedOutputSchema;
   }
 
-  // Register the tool
+  // Register the tool with audit logging
   return server.registerTool(
     name,
     config,
-    async (...cbArgs) => normalizeResultForOutputSchema(
-      await callback(...cbArgs),
-      processedOutputSchema
-    )
+    async (...cbArgs) => {
+      // Extract params for audit logging (first arg is typically the params object)
+      const params = cbArgs[0] || {};
+
+      return withAuditLogging(name, params, async () => {
+        return normalizeResultForOutputSchema(
+          await callback(...cbArgs),
+          processedOutputSchema
+        );
+      });
+    }
   );
 }
 

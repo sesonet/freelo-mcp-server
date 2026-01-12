@@ -1,159 +1,460 @@
 /**
  * Tasks Tools
- * Handles all task-related operations
+ * Handles task-related operations
+ *
+ * Enabled tools (11):
+ * - freelo_get_all_tasks (readonly)
+ * - freelo_get_task_details (readonly)
+ * - freelo_get_task_description (readonly)
+ * - freelo_get_finished_tasks (readonly)
+ * - freelo_get_public_link (readonly)
+ * - freelo_create_task (edit)
+ * - freelo_create_task_from_template (edit)
+ * - freelo_edit_task (edit)
+ * - freelo_update_task_description (edit)
+ * - freelo_finish_task (edit)
+ * - freelo_activate_task (edit)
  */
 
 import { z } from 'zod';
 import { createApiClient } from '../utils/apiClient.js';
 import { registerToolWithMetadata } from '../utils/registerToolWithMetadata.js';
-import { TaskSchema, createArrayResponseSchema } from '../utils/schemas.js';
+import { TaskSchema, TaskDetailedSchema, createArrayResponseSchema } from '../utils/schemas.js';
+import { isToolEnabled } from '../config/tools.js';
 
-export function registerTasksTools(server) {
-  registerToolWithMetadata(
-    server,
-    'get_all_tasks',
-    'Fetches all tasks across all projects with powerful filtering options. Supports 14 different filters including fulltext search, project/tasklist filtering, label filtering, date ranges, worker assignment, and pagination. This is the primary tool for finding tasks - essential for task management workflows. For tasks in a specific tasklist, use get_tasklist_tasks for simpler queries.',
-    {
-      filters: z.object({
-        search_query: z.string().optional().describe('Fulltext search in task names (case insensitive, e.g., "bug fix" or "feature")'),
-        state_id: z.number().optional().describe('Filter by task state ID: 1=active, 2=finished. Use get_all_states for complete list.'),
-        projects_ids: z.array(z.number()).optional().describe('Filter by project IDs (e.g., [197352, 198000]). Get from get_projects or get_all_projects.'),
-        tasklists_ids: z.array(z.number()).optional().describe('Filter by tasklist IDs (e.g., [12345, 67890]). Get from get_project_tasklists.'),
-        order_by: z.enum(['priority', 'name', 'date_add', 'date_edited_at']).optional().describe('Sort by: "priority" (task priority), "name" (alphabetically), "date_add" (creation date), "date_edited_at" (last modified)'),
-        order: z.enum(['asc', 'desc']).optional().describe('Sort direction: "asc" (ascending/A-Z/oldest first) or "desc" (descending/Z-A/newest first)'),
-        with_label: z.string().optional().describe('Include only tasks with this label name (case insensitive, e.g., "urgent", "bug"). Get labels from find_available_labels.'),
-        without_label: z.string().optional().describe('Exclude tasks with this label name (case insensitive). Useful for filtering out specific categories.'),
-        no_due_date: z.boolean().optional().describe('When true, returns only tasks without a due date. Useful for finding unscheduled work.'),
-        due_date_range: z.object({
-          date_from: z.string().describe('Start date in format YYYY-MM-DD or YYYY-MM-DD HH:MM:SS (e.g., "2025-10-01")'),
-          date_to: z.string().describe('End date in format YYYY-MM-DD or YYYY-MM-DD HH:MM:SS (e.g., "2025-10-31")')
-        }).optional().describe('Filter tasks with due dates within this range. Useful for deadline management.'),
-        finished_overdue: z.boolean().optional().describe('When true, returns only tasks finished after their due date (late completions). Good for performance tracking.'),
-        finished_date_range: z.object({
-          date_from: z.string().describe('Start date in format YYYY-MM-DD or YYYY-MM-DD HH:MM:SS'),
-          date_to: z.string().describe('End date in format YYYY-MM-DD or YYYY-MM-DD HH:MM:SS')
-        }).optional().describe('Filter by completion date range. Essential for reporting and retrospectives.'),
-        worker_id: z.number().optional().describe('Filter by assigned worker ID (numeric, e.g., 12345). Get worker IDs from get_project_workers or get_users.'),
-        p: z.number().optional().describe('Page number for pagination, starts at 0 (default: 0). Critical for large task sets to avoid token limits.')
-      }).optional().describe('Optional filters - combine multiple for precise queries')
-    },
-    async ({ filters = {} }) => {
-      try {
-        const auth = {
-          email: process.env.FREELO_EMAIL,
-          apiKey: process.env.FREELO_API_KEY,
-          userAgent: process.env.FREELO_USER_AGENT
-        };
-        const apiClient = createApiClient(auth);
-        const response = await apiClient.get('/all-tasks', { params: filters });
+export function registerTasksTools(server, readonlyMode = false) {
+  // freelo_get_all_tasks - readonly
+  if (isToolEnabled('get_all_tasks', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_get_all_tasks',
+      'Fetches all tasks across all projects with filtering. Supports search, project/tasklist filter, label filter, date ranges, worker assignment, and pagination.',
+      {
+        filters: z.object({
+          search_query: z.string().optional().describe('Fulltext search in task names'),
+          state_id: z.number().optional().describe('Task state: 1=active, 2=finished'),
+          projects_ids: z.array(z.number()).optional().describe('Filter by project IDs'),
+          tasklists_ids: z.array(z.number()).optional().describe('Filter by tasklist IDs'),
+          order_by: z.enum(['priority', 'name', 'date_add', 'date_edited_at']).optional().describe('Sort field'),
+          order: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
+          with_label: z.string().optional().describe('Include only tasks with this label'),
+          without_label: z.string().optional().describe('Exclude tasks with this label'),
+          no_due_date: z.boolean().optional().describe('Only tasks without due date'),
+          due_date_range: z.object({
+            date_from: z.string().describe('Start date YYYY-MM-DD'),
+            date_to: z.string().describe('End date YYYY-MM-DD')
+          }).optional().describe('Filter by due date range'),
+          worker_id: z.number().optional().describe('Filter by assigned worker ID'),
+          p: z.number().optional().describe('Page number (starts at 0)')
+        }).optional().describe('Optional filters')
+      },
+      async ({ filters = {} }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.get('/all-tasks', { params: filters });
 
-        // Handle different response formats
-        let data = response.data;
-        if (data && data.data && data.data.tasks) {
-          data = data.data.tasks;
-        }
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(data) }],
-          structuredContent: data
-        };
-      } catch (error) {
-        console.error('Error in get_all_tasks:', error);
-        throw new Error(`Failed to fetch tasks: ${error.message}`);
-      }
-    },
-    {
-      outputSchema: createArrayResponseSchema(TaskSchema)
-    }
-  );
-
-  registerToolWithMetadata(
-    server,
-    'get_tasklist_tasks',
-    'Fetches tasks from a specific tasklist within a project. Simpler than get_all_tasks when you already know the project and tasklist. Returns tasks sorted by priority by default. Use this when drilling down from project → tasklist → tasks hierarchy. For cross-project task searches or complex filtering, use get_all_tasks instead.',
-    {
-      projectId: z.string().describe('Unique project identifier (numeric string, e.g., "197352"). Get from get_projects or get_all_projects.'),
-      tasklistId: z.string().describe('Unique tasklist identifier (numeric string, e.g., "12345"). Get from get_project_tasklists or get_tasklist_details.'),
-      orderBy: z.enum(['priority', 'name', 'date_add', 'date_edited_at']).optional().describe('Sort by: "priority" (default, highest first), "name" (alphabetically), "date_add" (creation date), or "date_edited_at" (last modified)'),
-      order: z.enum(['asc', 'desc']).optional().describe('Sort direction: "asc" (ascending/A-Z/oldest first) or "desc" (descending/Z-A/newest first). Default: "asc"')
-    },
-    async ({ projectId, tasklistId, orderBy = 'priority', order = 'asc' }) => {
-      try {
-        const auth = {
-          email: process.env.FREELO_EMAIL,
-          apiKey: process.env.FREELO_API_KEY,
-          userAgent: process.env.FREELO_USER_AGENT
-        };
-        const apiClient = createApiClient(auth);
-        const response = await apiClient.get(`/project/${projectId}/tasklist/${tasklistId}/tasks`, {
-          params: {
-            order_by: orderBy,
-            order: order
+          let data = response.data;
+          if (data && data.data && data.data.tasks) {
+            data = data.data.tasks;
           }
-        });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(response.data) }],
-          structuredContent: response.data
-        };
-      } catch (error) {
-        console.error('Error in get_tasklist_tasks:', error);
-        throw new Error(`Failed to fetch tasklist tasks: ${error.message}`);
-      }
-    },
-    {
-      outputSchema: createArrayResponseSchema(TaskSchema)
-    }
-  );
 
-  registerToolWithMetadata(
-    server,
-    'create_task',
-    'Creates a new task in a specific tasklist within a project. The task is created in active state by default. You can optionally assign it to a worker, set a due date, and add a description. After creation, use edit_task for modifications, or create_subtask to add subtasks. For creating from templates, use create_task_from_template instead.',
-    {
-      projectId: z.string().describe('Unique project identifier (numeric string, e.g., "197352"). Get from get_projects or get_all_projects.'),
-      tasklistId: z.string().describe('Unique tasklist identifier where the task will be created (numeric string, e.g., "12345"). Get from get_project_tasklists.'),
-      taskData: z.object({
-        name: z.string().describe('Task name - clear and descriptive title (required, e.g., "Fix login bug" or "Design homepage mockup")'),
-        description: z.string().optional().describe('Optional: Detailed task description in plain text or markdown. Use for context, requirements, or acceptance criteria.'),
-        worker: z.number().optional().describe('Optional: User ID to assign the task to (numeric, e.g., 12345). Get from get_project_workers. Leave empty for unassigned.'),
-        dueDate: z.string().optional().describe('Optional: Due date in format YYYY-MM-DD or YYYY-MM-DD HH:MM:SS (e.g., "2025-10-15" or "2025-10-15 17:00:00")')
-      }).describe('Task creation data')
-    },
-    async ({ projectId, tasklistId, taskData }) => {
-      try {
-        const auth = {
-          email: process.env.FREELO_EMAIL,
-          apiKey: process.env.FREELO_API_KEY,
-          userAgent: process.env.FREELO_USER_AGENT
-        };
-        const apiClient = createApiClient(auth);
-
-        // Transform description to comment.content for API
-        const apiData = { ...taskData };
-        if (taskData.description) {
-          apiData.comment = { content: taskData.description };
-          delete apiData.description;
+          return {
+            content: [{ type: 'text', text: JSON.stringify(data) }],
+            structuredContent: data
+          };
+        } catch (error) {
+          console.error('Error in freelo_get_all_tasks:', error);
+          throw new Error(`Failed to fetch tasks: ${error.message}`);
         }
-
-        // Transform dueDate to due_date for API
-        if (taskData.dueDate) {
-          apiData.due_date = taskData.dueDate;
-          delete apiData.dueDate;
-        }
-
-        const response = await apiClient.post(`/project/${projectId}/tasklist/${tasklistId}/tasks`, apiData);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(response.data) }],
-          structuredContent: response.data
-        };
-      } catch (error) {
-        console.error('Error in create_task:', error);
-        throw new Error(`Failed to create task: ${error.message}`);
+      },
+      {
+        outputSchema: createArrayResponseSchema(TaskSchema),
+        annotations: { readOnlyHint: true }
       }
-    },
-    {
-      outputSchema: TaskSchema
-    }
-  );
+    );
+  }
 
+  // freelo_get_task_details - readonly
+  if (isToolEnabled('get_task_details', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_get_task_details',
+      'Fetches complete details about a specific task including name, description, assignees, due date, priority, status, labels, and metadata. Use after finding tasks with freelo_get_all_tasks.',
+      {
+        taskId: z.string().describe('Task ID (e.g., "25368707"). Get from freelo_get_all_tasks.')
+      },
+      async ({ taskId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.get(`/task/${taskId}`);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_get_task_details:', error);
+          throw new Error(`Failed to fetch task details: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskDetailedSchema,
+        annotations: { readOnlyHint: true }
+      }
+    );
+  }
+
+  // freelo_get_task_description - readonly
+  if (isToolEnabled('get_task_description', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_get_task_description',
+      'Fetches only the description content of a task. More lightweight than freelo_get_task_details when you only need the description text.',
+      {
+        taskId: z.string().describe('Task ID (e.g., "25368707"). Get from freelo_get_all_tasks.')
+      },
+      async ({ taskId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.get(`/task/${taskId}/description`);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_get_task_description:', error);
+          throw new Error(`Failed to fetch task description: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskDetailedSchema,
+        annotations: { readOnlyHint: true }
+      }
+    );
+  }
+
+  // freelo_get_finished_tasks - readonly
+  if (isToolEnabled('get_finished_tasks', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_get_finished_tasks',
+      'Fetches completed/finished tasks from a specific tasklist. For finished tasks across all projects, use freelo_get_all_tasks with state_id=2.',
+      {
+        tasklistId: z.string().describe('Tasklist ID (e.g., "12345"). Get from freelo_get_project_tasklists.'),
+        search_query: z.string().optional().describe('Optional fulltext search to filter task names')
+      },
+      async ({ tasklistId, search_query }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const params = search_query ? { search_query } : {};
+          const response = await apiClient.get(`/tasklist/${tasklistId}/finished-tasks`, { params });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_get_finished_tasks:', error);
+          throw new Error(`Failed to fetch finished tasks: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: createArrayResponseSchema(TaskSchema),
+        annotations: { readOnlyHint: true }
+      }
+    );
+  }
+
+  // freelo_get_public_link - readonly
+  if (isToolEnabled('get_public_link', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_get_public_link',
+      'Generates or retrieves a public sharing link for a task. Anyone with this link can view task details without logging in.',
+      {
+        taskId: z.string().describe('Task ID (e.g., "25368707"). Get from freelo_get_all_tasks.')
+      },
+      async ({ taskId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.get(`/public-link/task/${taskId}`);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_get_public_link:', error);
+          throw new Error(`Failed to get public link: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: z.object({ url: z.string().url() }),
+        annotations: { readOnlyHint: true }
+      }
+    );
+  }
+
+  // freelo_create_task - edit only
+  if (isToolEnabled('create_task', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_create_task',
+      'Creates a new task in a specific tasklist. Task is created in active state.',
+      {
+        projectId: z.string().describe('Project ID. Get from freelo_get_projects.'),
+        tasklistId: z.string().describe('Tasklist ID. Get from freelo_get_project_tasklists.'),
+        taskData: z.object({
+          name: z.string().describe('Task name (required)'),
+          description: z.string().optional().describe('Task description (markdown)'),
+          worker: z.number().optional().describe('Assigned worker ID'),
+          dueDate: z.string().optional().describe('Due date YYYY-MM-DD')
+        }).describe('Task data')
+      },
+      async ({ projectId, tasklistId, taskData }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+
+          const apiData = { ...taskData };
+          if (taskData.description) {
+            apiData.comment = { content: taskData.description };
+            delete apiData.description;
+          }
+          if (taskData.dueDate) {
+            apiData.due_date = taskData.dueDate;
+            delete apiData.dueDate;
+          }
+
+          const response = await apiClient.post(`/project/${projectId}/tasklist/${tasklistId}/tasks`, apiData);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_create_task:', error);
+          throw new Error(`Failed to create task: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
+
+  // freelo_create_task_from_template - edit only
+  if (isToolEnabled('create_task_from_template', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_create_task_from_template',
+      'Creates a new task based on an existing template task. The new task inherits the template\'s name, description, and structure.',
+      {
+        templateId: z.string().describe('Template task ID. Get from template projects.'),
+        projectId: z.string().describe('Target project ID. Get from freelo_get_projects.'),
+        tasklistId: z.string().describe('Target tasklist ID. Get from freelo_get_project_tasklists.')
+      },
+      async ({ templateId, projectId, tasklistId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.post(`/task/create-from-template/${templateId}`, {
+            project_id: projectId,
+            tasklist_id: tasklistId
+          });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_create_task_from_template:', error);
+          throw new Error(`Failed to create task from template: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
+
+  // freelo_edit_task - edit only
+  if (isToolEnabled('edit_task', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_edit_task',
+      'Updates an existing task. Can modify name, assignment, due date, or priority. For description updates, use freelo_update_task_description.',
+      {
+        taskId: z.string().describe('Task ID to update. Get from freelo_get_all_tasks.'),
+        taskData: z.object({
+          name: z.string().optional().describe('New task name'),
+          worker: z.number().optional().describe('User ID to assign task to'),
+          dueDate: z.string().optional().describe('New due date (YYYY-MM-DD)'),
+          priority: z.number().optional().describe('Task priority (higher = more important)')
+        }).describe('Task update data - only include fields to change')
+      },
+      async ({ taskId, taskData }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+
+          const apiData = { ...taskData };
+          if (taskData.dueDate) {
+            apiData.due_date = taskData.dueDate;
+            delete apiData.dueDate;
+          }
+
+          const response = await apiClient.post(`/task/${taskId}`, apiData);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_edit_task:', error);
+          throw new Error(`Failed to edit task: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
+
+  // freelo_update_task_description - edit only
+  if (isToolEnabled('update_task_description', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_update_task_description',
+      'Updates only the description of a task. Supports plain text or markdown. Previous description is replaced completely.',
+      {
+        taskId: z.string().describe('Task ID. Get from freelo_get_all_tasks.'),
+        description: z.string().describe('New description content (markdown supported). Use empty string to clear.')
+      },
+      async ({ taskId, description }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.post(`/task/${taskId}/description`, { content: description });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_update_task_description:', error);
+          throw new Error(`Failed to update task description: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskDetailedSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
+
+  // freelo_finish_task - edit only
+  if (isToolEnabled('finish_task', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_finish_task',
+      'Marks a task as finished/completed. Task is moved to finished state, preserving all data. Can be reactivated with freelo_activate_task.',
+      {
+        taskId: z.string().describe('Task ID to mark as finished. Get from freelo_get_all_tasks.')
+      },
+      async ({ taskId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.post(`/task/${taskId}/finish`);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_finish_task:', error);
+          throw new Error(`Failed to finish task: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
+
+  // freelo_activate_task - edit only
+  if (isToolEnabled('activate_task', readonlyMode)) {
+    registerToolWithMetadata(
+      server,
+      'freelo_activate_task',
+      'Reactivates a finished task, moving it back to active state. Use when a completed task needs to be reopened.',
+      {
+        taskId: z.string().describe('Task ID to reactivate. Must be a finished task.')
+      },
+      async ({ taskId }) => {
+        try {
+          const auth = {
+            email: process.env.FREELO_EMAIL,
+            apiKey: process.env.FREELO_API_KEY,
+            userAgent: process.env.FREELO_USER_AGENT
+          };
+          const apiClient = createApiClient(auth);
+          const response = await apiClient.post(`/task/${taskId}/activate`);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(response.data) }],
+            structuredContent: response.data
+          };
+        } catch (error) {
+          console.error('Error in freelo_activate_task:', error);
+          throw new Error(`Failed to activate task: ${error.message}`);
+        }
+      },
+      {
+        outputSchema: TaskSchema,
+        annotations: { idempotentHint: true }
+      }
+    );
+  }
 }

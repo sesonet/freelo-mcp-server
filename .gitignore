@@ -18,6 +18,13 @@ package-lock.json
 *.swp
 *.swo
 *~
+*.code-workspace
+
+# Claude
+.claude/
+
+# Plans (local brainstorming)
+docs/plans/
 
 # Logs
 logs/

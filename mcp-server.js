@@ -1,73 +1,78 @@
 /**
- * MCP Server for Freelo API
- * This server implements the Model Context Protocol for Freelo API integration
+ * @sesonet/freelo-mcp-server
+ *
+ * MCP Server for Freelo API with:
+ * - Reduced toolset (32 tools instead of 98)
+ * - Readonly mode (--readonly flag)
+ * - Audit logging
+ *
+ * Fork of karlost/FreeloMCP
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import dotenv from 'dotenv';
+import { isReadonlyMode, getEnabledTools } from './config/tools.js';
+import { isAuditEnabled, getAuditLogPath } from './utils/auditLogger.js';
 
 // Load environment variables
 dotenv.config();
 
-// Validate environment variables
-// Note: MCP servers communicate via stdio, so we cannot use console.log/warn
-// Missing env vars will cause authentication errors when tools are called
-if (!process.env.FREELO_EMAIL || !process.env.FREELO_API_KEY || !process.env.FREELO_USER_AGENT) {
-  // Env vars missing - tools will fail if auth params not provided
+// Check readonly mode
+const READONLY_MODE = isReadonlyMode();
+
+// Log to stderr (stdout is reserved for MCP protocol)
+function log(level, message) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] [${level}] ${message}`);
 }
 
-// Import tool registrations
+// Validate environment variables
+if (!process.env.FREELO_EMAIL || !process.env.FREELO_API_KEY) {
+  log('WARN', 'FREELO_EMAIL or FREELO_API_KEY not set. Tools will fail without credentials.');
+}
+
+// Import tool registrations - only needed categories
 import { registerProjectsTools } from './tools/projects.js';
 import { registerTasksTools } from './tools/tasks.js';
 import { registerTasklistsTools } from './tools/tasklists.js';
 import { registerSubtasksTools } from './tools/subtasks.js';
 import { registerCommentsTools } from './tools/comments.js';
-import { registerFilesTools } from './tools/files.js';
 import { registerUsersTools } from './tools/users.js';
 import { registerTimeTrackingTools } from './tools/time-tracking.js';
 import { registerWorkReportsTools } from './tools/work-reports.js';
-import { registerCustomFieldsTools } from './tools/custom-fields.js';
-import { registerInvoicesTools } from './tools/invoices.js';
-import { registerNotificationsTools } from './tools/notifications.js';
 import { registerNotesTools } from './tools/notes.js';
-import { registerEventsTools } from './tools/events.js';
-import { registerFiltersTools } from './tools/filters.js';
-import { registerLabelsTools } from './tools/labels.js';
-import { registerPinnedItemsTools } from './tools/pinned-items.js';
 import { registerStatesTools } from './tools/states.js';
 import { registerSearchTools } from './tools/search.js';
-import { registerCoreTools } from './tools/core.js';
 
 // Function to initialize the server and register tools
 export function initializeMcpServer() {
+  const enabledTools = getEnabledTools(READONLY_MODE);
+
+  log('INFO', `@sesonet/freelo-mcp-server v1.0.0 starting...`);
+  log('INFO', `Mode: ${READONLY_MODE ? 'READONLY' : 'FULL'} (${enabledTools.length} tools)`);
+  log('INFO', `Audit: ${isAuditEnabled() ? `enabled (${getAuditLogPath()})` : 'disabled'}`);
+
   const server = new McpServer({
-    name: 'freelo-mcp',
+    name: '@sesonet/freelo-mcp-server',
     version: '1.0.0',
-    description: 'MCP Server for Freelo API v1'
+    description: 'MCP Server for Freelo API - readonly mode, audit logging, reduced toolset'
   });
 
-  // Register all tool categories
-  registerProjectsTools(server);
-  registerTasksTools(server);
-  registerTasklistsTools(server);
-  registerSubtasksTools(server);
-  registerCommentsTools(server);
-  registerFilesTools(server);
-  registerUsersTools(server);
-  registerTimeTrackingTools(server);
-  registerWorkReportsTools(server);
-  registerCustomFieldsTools(server);
-  registerInvoicesTools(server);
-  registerNotificationsTools(server);
-  registerNotesTools(server);
-  registerEventsTools(server);
-  registerFiltersTools(server);
-  registerLabelsTools(server);
-  registerPinnedItemsTools(server);
-  registerStatesTools(server);
-  registerSearchTools(server);
-  registerCoreTools(server);  // Core contains all tools not yet split into categories
+  // Register tool categories with readonly filter
+  registerProjectsTools(server, READONLY_MODE);
+  registerTasksTools(server, READONLY_MODE);
+  registerTasklistsTools(server, READONLY_MODE);
+  registerSubtasksTools(server, READONLY_MODE);
+  registerCommentsTools(server, READONLY_MODE);
+  registerUsersTools(server, READONLY_MODE);
+  registerTimeTrackingTools(server, READONLY_MODE);
+  registerWorkReportsTools(server, READONLY_MODE);
+  registerNotesTools(server, READONLY_MODE);
+  registerStatesTools(server, READONLY_MODE);
+  registerSearchTools(server, READONLY_MODE);
+
+  log('INFO', 'Server ready');
 
   return server;
 }
@@ -79,17 +84,15 @@ export async function startStdioServer() {
 
   try {
     await serverInstance.connect(transport);
-    // MCP komunikuje přes stdio - nepoužívat console.log()!
   } catch (error) {
-    // Log pouze do stderr v případě kritické chyby
-    console.error('Failed to start MCP server:', error);
+    log('ERROR', `Failed to start MCP server: ${error.message}`);
     process.exit(1);
   }
 }
 
-// Auto-start only when NOT imported (i.e., run directly or via bin)
-// Check if we're being imported by looking at the call stack
-const isImported = new Error().stack?.includes('mcp-server-sse.js');
+// Auto-start when run directly
+const isImported = new Error().stack?.includes('mcp-server-sse.js') ||
+                   new Error().stack?.includes('mcp-server-http.js');
 
 if (!isImported) {
   startStdioServer();
